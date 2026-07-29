@@ -3,123 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Golden Stats Pro</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Football AI v2</title>
+    <link rel="stylesheet" href="css/style.css">
 </head>
-<body class="bg-zinc-950 text-white font-sans min-h-screen p-3 flex justify-center items-start">
-
-    <div class="w-full max-w-md bg-zinc-900 rounded-3xl p-5 border border-amber-500/30 shadow-2xl space-y-6 mt-2">
-        
-        <!-- Header Meci -->
-        <div class="text-center space-y-2">
-            <h1 class="text-xs font-bold text-amber-400 tracking-widest uppercase">UEFA Champions League</h1>
-            
-            <div class="flex items-center justify-around py-2">
-                <div class="flex flex-col items-center">
-                    <div class="w-14 h-14 bg-zinc-800 rounded-2xl flex items-center justify-center border border-zinc-700 text-xl font-bold text-amber-400 shadow">
-                        GZ
-                    </div>
-                    <span class="text-xs font-bold mt-2 text-zinc-200">Gornik Zabrze</span>
-                </div>
-
-                <span class="text-zinc-500 font-extrabold text-sm">VS</span>
-
-                <div class="flex flex-col items-center">
-                    <div class="w-14 h-14 bg-zinc-800 rounded-2xl flex items-center justify-center border border-zinc-700 text-xl font-bold text-amber-400 shadow">
-                        FB
-                    </div>
-                    <span class="text-xs font-bold mt-2 text-zinc-200">Fenerbahçe</span>
-                </div>
-            </div>
+<body>
+    <header class="navbar">
+        <h1>⚽ Football AI v2</h1>
+        <div class="stats-summary">
+            <span>Liga selectată: <strong id="current-league">Toate</strong></span>
         </div>
+    </header>
 
-        <hr class="border-zinc-800" />
+    <main class="container">
+        <!-- Secțiunea de Filtre -->
+        <section class="filters">
+            <label for="league-select">Alege Liga:</label>
+            <select id="league-select">
+                <option value="all">Toate Ligile</option>
+                <option value="premier-league">Premier League</option>
+                <option value="la-liga">La Liga</option>
+                <option value="serie-a">Serie A</option>
+            </select>
+        </section>
 
-        <!-- Comparatie Directa (Procente paralele) -->
-        <div class="space-y-3 text-xs">
-            <h2 class="text-center text-amber-400 font-bold tracking-wide">Comparație Ultimele 7 Meciuri</h2>
+        <!-- Tabel Meciuri și Predicții -->
+        <section class="matches-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Data / Ora</th>
+                        <th>Meci</th>
+                        <th>Cotă 1</th>
+                        <th>Cotă X</th>
+                        <th>Cotă 2</th>
+                        <th>Predicție AI</th>
+                        <th>Incredere</th>
+                    </tr>
+                </thead>
+                <tbody id="matches-table-body">
+                    <!-- Meciurile vor fi generate automat din JavaScript -->
+                    <tr>
+                        <td colspan="7" style="text-align: center;">Se încarcă datele...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+    </main>
 
-            <!-- Stat 1 -->
-            <div class="flex items-center justify-between bg-zinc-950 p-2.5 rounded-xl border border-zinc-800">
-                <span class="font-bold text-amber-400 w-12 text-left">71.43%</span>
-                <span class="text-zinc-400 font-medium">Peste 0.5 HT</span>
-                <span class="font-bold text-amber-400 w-12 text-right">100.00%</span>
-            </div>
-
-            <!-- Stat 2 -->
-            <div class="flex items-center justify-between bg-zinc-950 p-2.5 rounded-xl border border-zinc-800">
-                <span class="font-bold text-amber-400 w-12 text-left">71.43%</span>
-                <span class="text-zinc-400 font-medium">Peste 1.5 Goluri</span>
-                <span class="font-bold text-amber-400 w-12 text-right">85.71%</span>
-            </div>
-
-            <!-- Stat 3 -->
-            <div class="flex items-center justify-between bg-zinc-950 p-2.5 rounded-xl border border-zinc-800">
-                <span class="font-bold text-amber-400 w-12 text-left">57.14%</span>
-                <span class="text-zinc-400 font-medium">Peste 2.5 Goluri</span>
-                <span class="font-bold text-amber-400 w-12 text-right">85.71%</span>
-            </div>
-
-            <!-- Stat 4 -->
-            <div class="flex items-center justify-between bg-zinc-950 p-2.5 rounded-xl border border-zinc-800">
-                <span class="font-bold text-amber-400 w-12 text-left">57.14%</span>
-                <span class="text-zinc-400 font-medium">Ambele Marchează</span>
-                <span class="font-bold text-amber-400 w-12 text-right">42.86%</span>
-            </div>
-        </div>
-
-        <hr class="border-zinc-800" />
-
-        <!-- Probabilitate Combinata (Bare de Progres) -->
-        <div class="space-y-3">
-            <h2 class="text-center text-amber-400 font-bold text-xs tracking-wide">Probabilitate Matematică Meci</h2>
-
-            <!-- Bara Verde (Probabilitate Mare) -->
-            <div class="space-y-1">
-                <div class="flex justify-between text-xs">
-                    <span class="text-zinc-300 font-semibold">Peste 1.5 Goluri</span>
-                    <span class="text-emerald-400 font-bold">78.57%</span>
-                </div>
-                <div class="w-full bg-zinc-800 h-2.5 rounded-full overflow-hidden">
-                    <div class="bg-emerald-500 h-full rounded-full" style="width: 78.57%"></div>
-                </div>
-            </div>
-
-            <!-- Bara Verde 2 -->
-            <div class="space-y-1">
-                <div class="flex justify-between text-xs">
-                    <span class="text-zinc-300 font-semibold">Peste 2.5 Goluri</span>
-                    <span class="text-emerald-400 font-bold">71.43%</span>
-                </div>
-                <div class="w-full bg-zinc-800 h-2.5 rounded-full overflow-hidden">
-                    <div class="bg-emerald-500 h-full rounded-full" style="width: 71.43%"></div>
-                </div>
-            </div>
-
-            <!-- Bara Portocalie (Probabilitate Medie) -->
-            <div class="space-y-1">
-                <div class="flex justify-between text-xs">
-                    <span class="text-zinc-300 font-semibold">Ambele Marchează (GG)</span>
-                    <span class="text-amber-400 font-bold">50.00%</span>
-                </div>
-                <div class="w-full bg-zinc-800 h-2.5 rounded-full overflow-hidden">
-                    <div class="bg-amber-500 h-full rounded-full" style="width: 50.00%"></div>
-                </div>
-            </div>
-
-            <!-- Bara Rosie (Probabilitate Mica) -->
-            <div class="space-y-1">
-                <div class="flex justify-between text-xs">
-                    <span class="text-zinc-300 font-semibold">Peste 3.5 Cartonașe</span>
-                    <span class="text-rose-500 font-bold">21.43%</span>
-                </div>
-                <div class="w-full bg-zinc-800 h-2.5 rounded-full overflow-hidden">
-                    <div class="bg-rose-500 h-full rounded-full" style="width: 21.43%"></div>
-                </div>
-            </div>
-        </div>
-
-    </div>
-
+    <script src="js/app.js"></script>
 </body>
 </html>
