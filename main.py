@@ -1,11 +1,11 @@
 from fastapi import FastAPI 
 from fastapi.middleware.cors import CORSMiddleware
 import requests
-from bs4 import BeautifulSoup
+from datetime import datetime
 
 app = FastAPI()
 
-# Permite interfeței tale HTML (care rulează pe alt port/local) să acceseze API-ul
+# Permitem accesul din interfața Web
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -14,47 +14,54 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-def scrape_live_odds():
-    """
-    Exemplu de funcție de scraping. 
-    Aici înlocuiești URL-ul și selectorii cu site-ul dorit.
-    """
-    # Exemplu simulat de extragere de date
-    # În producție folosești requests.get(URL) + BeautifulSoup(response.text, 'html.parser')
+def get_sofascore_matches():
+    # Endpoint-ul SofaScore pe care l-ai găsit
+    url = "https://www.sofascore.com/api/v1/unique-tournament/13470/scheduled-events/2026-07-29"
     
-    matches = [
-        {
-            "datetime": "Azi, 21:00",
-            "league": "premier-league",
-            "homeTeam": "Arsenal",
-            "awayTeam": "Liverpool",
-            "odds1": "2.10",
-            "oddsX": "3.30",
-            "odds2": "3.20",
-            "prediction": "Peste 2.5 goluri",
-            "confidence": "Mare"
-        },
-        {
-            "datetime": "Azi, 22:00",
-            "league": "la-liga",
-            "homeTeam": "Real Madrid",
-            "awayTeam": "Barcelona",
-            "odds1": "1.95",
-            "oddsX": "3.60",
-            "odds2": "3.70",
-            "prediction": "Ambele Marchează",
-            "confidence": "Mare"
-        }
-    ]
-    return matches
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*"
+    }
+    
+    parsed_matches = []
+    
+    try:
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            data = response.json()
+            events = data.get("events", [])
+            
+            for event in events:
+                home_team = event.get("homeTeam", {}).get("name", "Gazde")
+                away_team = event.get("awayTeam", {}).get("name", "Oaspeți")
+                
+                # Formatare oră meci
+                timestamp = event.get("startTimestamp")
+                match_time = datetime.fromtimestamp(timestamp).strftime("%H:%M") if timestamp else "Azi"
+                
+                parsed_matches.append({
+                    "datetime": f"Azi, {match_time}",
+                    "league": "premier-league",
+                    "homeTeam": home_team,
+                    "awayTeam": away_team,
+                    "odds1": "1.95", # Cotele pot fi extrase separat per meci
+                    "oddsX": "3.40",
+                    "odds2": "3.80",
+                    "prediction": "Vic. Gazde",
+                    "confidence": "Mare"
+                })
+        else:
+            print(f"Eroare API SofaScore: {response.status_code}")
+    except Exception as e:
+        print(f"Excepție întâmpinată: {e}")
+        
+    return parsed_matches
 
 @app.get("/api/matches")
 def get_matches():
-    # Când frontend-ul cere datele, rulați scraperul și returnăm datele
-    live_data = scrape_live_odds()
-    return live_data
+    # Trimite meciurile din API-ul SofaScore către Frontend
+    return get_sofascore_matches()
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="127.0.0.1", port=8000)
-
