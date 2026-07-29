@@ -1,1 +1,191 @@
+/* ========================================== 
+   RESET & VARIABILE
+   ========================================== */
+:root {
+    --bg-main: #0f172a; /* Fundal închis (Slate 900) */
+    --bg-card: #1e293b; /* Carduri/Sectiuni (Slate 800) */
+    --bg-header: #1e293b;     
+    --text-main: #f8fafc; /* Text alb/gri deschis */
+    --text-muted: #94a3b8; /* Text secundar/gri */
+    --accent: #38bdf8; /* Albastru neon pentru evidențieri */
+    --accent-hover: #0284c7;
+    --border: #334155; /* Linii discrete de separare */
+    --success: #22c55e; /* Verde pentru predicții sigure */
+    --warning: #eab308; /* Galben pentru opțiuni medii */
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+body {
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    line-height: 1.6;
+    padding-bottom: 40px;
+}
+
+/* ==========================================
+   NAVBAR / HEADER
+   ========================================== */
+.navbar {
+    background-color: var(--bg-header);
+    padding: 1.2rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+}
+
+.navbar h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--accent);
+}
+
+.stats-summary {
+    font-size: 0.95rem;
+    color: var(--text-muted);
+}
+
+.stats-summary strong {
+    color: var(--text-main);
+}
+
+/* ==========================================
+   CONTAINER & FILTRE
+   ========================================== */
+.container {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+}
+
+.filters {
+    background-color: var(--bg-card);
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border: 1px solid var(--border);
+}
+
+.filters label {
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.filters select {
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    border: 1px solid var(--border);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.filters select:focus {
+    border-color: var(--accent);
+}
+
+/* ==========================================
+   TABEL MECIURI
+   ========================================== */
+.matches-container {
+    background-color: var(--bg-card);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    overflow-x: auto; /* Permite scroll orizontal pe mobil */
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+}
+
+thead {
+    background-color: rgba(15, 23, 42, 0.6);
+    border-bottom: 2px solid var(--border);
+}
+
+th {
+    padding: 1rem;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+
+td {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.95rem;
+}
+
+tbody tr:last-child td {
+    border-bottom: none;
+}
+
+tbody tr:hover {
+    background-color: rgba(255, 255, 255, 0.03);
+}
+
+/* Formatare specifică pentru cote și predicții */
+.odds {
+    font-weight: 600;
+    color: var(--accent);
+    background-color: rgba(56, 189, 248, 0.1);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.badge {
+    padding: 0.25rem 0.6rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.badge-high {
+    background-color: rgba(34, 197, 94, 0.15);
+    color: var(--success);
+}
+
+.badge-med {
+    background-color: rgba(234, 179, 8, 0.15);
+    color: var(--warning);
+}
+
+/* ==========================================
+   RESPONSIVE (MOBIL)
+   ========================================== */
+@media (max-width: 768px) {
+    .navbar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .filters {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    th, td {
+        padding: 0.75rem 0.5rem;
+    }
+}
 
