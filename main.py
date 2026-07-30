@@ -48,7 +48,7 @@ def get_rapidapi_matches():
     url = "https://api-football186.p.rapidapi.com/competition_matches_list"
     
     headers = {
-        "x-rapidapi-key": RAPIDAPI_KEY,
+        "x-rapidapi-key": "2ac6bb003amshea4487405e15e1fp18b95ejsn700b80898b4a",
         "x-rapidapi-host": "api-football186.p.rapidapi.com"
     }
     
