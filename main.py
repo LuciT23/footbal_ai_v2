@@ -37,7 +37,7 @@ def get_sofascore_rapidapi_matches():
     url = "https://sofascore3.p.rapidapi.com/matches/list-by-date"
     
     headers = {
-        "X-RapidAPI-Key": RAPIDAPI_KEY,
+        "X-RapidAPI-Key": "2ac6bb003amshea4487405e15e1fp18b95ejsn700b80898b4a",
         "X-RapidAPI-Host": "sofascore3.p.rapidapi.com"
     }
     
