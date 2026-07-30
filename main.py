@@ -30,8 +30,7 @@ def read_css():
 @app.get("/app.js")
 def read_js():
     return FileResponse("app.js")
-
-@app.get("/api/matches")
+@app.get("/api/matches") 
 def get_rapidapi_matches():
     global cached_matches, last_fetch_time
     now = datetime.now()
@@ -41,7 +40,6 @@ def get_rapidapi_matches():
         return cached_matches
 
     today_str = now.strftime("%Y-%m-%d")
-    
     url = "https://api-football186.p.rapidapi.com/competition_matches_list"
     
     headers = {
@@ -63,52 +61,69 @@ def get_rapidapi_matches():
         
         if response.status_code == 200:
             data = response.json()
+            matches_found = []
             
-            # Printăm în consolă structura exactă primită pentru verificare
-            print("--> Structură răspuns primita:", type(data))
-            
-            # Identificare automată listă meciuri
-            raw_list = []
-            if isinstance(data, list):
-                raw_list = data
-            elif isinstance(data, dict):
-                # Căutăm lista în cheile comune
-                for key in ["data", "result", "response", "matches", "events"]:
-                    if key in data and isinstance(data[key], list):
-                        raw_list = data[key]
-                        break
-                # Dacă nu găsim o cheie cunoscută, luăm prima listă găsită în dicționar
-                if not raw_list:
-                    for val in data.values():
-                        if isinstance(val, list):
-                            raw_list = val
-                            break
+            def extract_matches(obj):
+                if isinstance(obj, list):
+                    for item in obj:
+                        extract_matches(item)
+                elif isinstance(obj, dict):
+                    # Identificăm dacă obiectul reprezintă un meci
+                    if any(k in obj for k in ["teama", "team_a", "home_team", "home", "homeTeam", "teams"]):
+                        matches_found.append(obj)
+                    else:
+                        for val in obj.values():
+                            extract_matches(val)
 
-            print(f"--> Meciuri extrase din JSON: {len(raw_list)}")
+            extract_matches(data)
+            print(f"--> Meciuri identificate: {len(matches_found)}")
             
-            for item in raw_list[:25]:
-                if not isinstance(item, dict):
-                    continue
-                    
-                home_team = item.get("home_team_name", item.get("home_name", item.get("home", "Gazde")))
-                away_team = item.get("away_team_name", item.get("away_name", item.get("away", "Oaspeți")))
-                league_name = item.get("league_name", item.get("competition_name", item.get("competition", "Fotbal")))
-                match_time = item.get("time", item.get("match_time", item.get("status", "Azi")))
+            for item in matches_found:
+                # Extragere nume echipa gazdă
+                home = (
+                    item.get("teama", {}).get("name") if isinstance(item.get("teama"), dict) else
+                    item.get("home_team", {}).get("name") if isinstance(item.get("home_team"), dict) else
+                    item.get("teama") or item.get("home_team_name") or item.get("home_name") or item.get("home") or item.get("team_a")
+                )
                 
-                parsed_matches.append({
-                    "datetime": f"Azi, {match_time}",
-                    "league": league_name,
-                    "homeTeam": home_team,
-                    "awayTeam": away_team,
-                    "odds1": "2.10",
-                    "oddsX": "3.25",
-                    "odds2": "3.50",
-                    "prediction": "1X",
-                    "confidence": "Mare"
-                })
+                # Extragere nume echipa oaspete
+                away = (
+                    item.get("teamb", {}).get("name") if isinstance(item.get("teamb"), dict) else
+                    item.get("away_team", {}).get("name") if isinstance(item.get("away_team"), dict) else
+                    item.get("teamb") or item.get("away_team_name") or item.get("away_name") or item.get("away") or item.get("team_b")
+                )
+                
+                # Extragere ligă
+                league = (
+                    item.get("competition", {}).get("name") if isinstance(item.get("competition"), dict) else
+                    item.get("cname") or item.get("league_name") or item.get("competition_name") or item.get("competition") or "Fotbal"
+                )
+                
+                # Ora meciului
+                match_time = item.get("time") or item.get("status_str") or item.get("status") or "Azi"
+                
+                # Fallback în caz că numele sunt numere sau lipsesc
+                home_str = str(home) if home and not str(home).isdigit() else "Gazde"
+                away_str = str(away) if away and not str(away).isdigit() else "Oaspeți"
+                league_str = str(league) if league else "Fotbal"
+                
+                # Dacă am găsit cel puțin un nume valid de echipă, adăugăm meciul
+                if home_str != "Gazde" or away_str != "Oaspeți":
+                    parsed_matches.append({
+                        "datetime": f"Azi, {match_time}",
+                        "league": league_str,
+                        "homeTeam": home_str,
+                        "awayTeam": away_str,
+                        "odds1": "2.10",
+                        "oddsX": "3.25",
+                        "odds2": "3.50",
+                        "prediction": "1X",
+                        "confidence": "Mare"
+                    })
                 
             cached_matches = parsed_matches
             last_fetch_time = now
+            print(f"--> Am procesat cu succes {len(parsed_matches)} meciuri cu nume reale!")
         else:
             print(f"--> Eroare API {response.status_code}: {response.text}")
             
@@ -116,6 +131,7 @@ def get_rapidapi_matches():
         print(f"--> Excepție întâmpinată: {e}")
         
     return parsed_matches
+
 
 if __name__ == "__main__":
     import uvicorn
