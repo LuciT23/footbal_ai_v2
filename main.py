@@ -1,10 +1,8 @@
 from fastapi import FastAPI 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
 import requests
 from datetime import datetime
-import os
 
 app = FastAPI()
 
@@ -16,22 +14,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Conectăm folderele statice (CSS și JS) direct dacă ele există
-if os.path.exists("css"):
-    app.mount("/css", StaticFiles(directory="css"), name="css")
-if os.path.exists("js"):
-    app.mount("/js", StaticFiles(directory="js"), name="js")
-
 # PUNE CHEIA TA API AICI:
 API_KEY = "PUNE_AICI_CHEIA_TA_FOOTBALL_DATA"
 
+# Rute pentru fișierele din rădăcină
 @app.get("/")
 def read_index():
     return FileResponse("index.html")
 
+@app.get("/style.css")
+def read_css():
+    return FileResponse("style.css")
+
+@app.get("/app.js")
+def read_js():
+    return FileResponse("app.js")
+
 @app.get("/api/matches")
 def get_football_data_matches():
-    # Meciurile programate
     url = "https://api.football-data.org/v4/competitions/PL/matches?status=SCHEDULED"
     headers = {"X-Auth-Token": API_KEY}
     parsed_matches = []
