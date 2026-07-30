@@ -16,7 +16,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Conectăm folderele css și js pentru a putea fi citite de browser
+# Conectăm folderele statice (CSS și JS) direct dacă ele există
 if os.path.exists("css"):
     app.mount("/css", StaticFiles(directory="css"), name="css")
 if os.path.exists("js"):
@@ -25,19 +25,21 @@ if os.path.exists("js"):
 # PUNE CHEIA TA API AICI:
 API_KEY = "PUNE_AICI_CHEIA_TA_FOOTBALL_DATA"
 
-# Când deschizi adresa principală (/), trimitem fișierul index.html
 @app.get("/")
 def read_index():
     return FileResponse("index.html")
 
 @app.get("/api/matches")
 def get_football_data_matches():
+    # Meciurile programate
     url = "https://api.football-data.org/v4/competitions/PL/matches?status=SCHEDULED"
     headers = {"X-Auth-Token": API_KEY}
     parsed_matches = []
     
     try:
         response = requests.get(url, headers=headers)
+        print(f"Status Code Football-Data: {response.status_code}")
+        
         if response.status_code == 200:
             data = response.json()
             matches = data.get("matches", [])
@@ -61,13 +63,13 @@ def get_football_data_matches():
                     "odds1": "1.85",
                     "oddsX": "3.50",
                     "odds2": "4.10",
-                    "prediction": "1 (Vic. Gazde)",
+                    "prediction": "Vic. Gazde",
                     "confidence": "Mare"
                 })
         else:
-            print(f"Eroare API: {response.status_code}")
+            print(f"Eroare API: {response.status_code} - {response.text}")
     except Exception as e:
-        print(f"Excepție: {e}")
+        print(f"Excepție întâmpinată: {e}")
         
     return parsed_matches
 
