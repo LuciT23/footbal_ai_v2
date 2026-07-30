@@ -14,10 +14,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# PUNE CHEIA TA API AICI:
-API_KEY = "PUNE_AICI_CHEIA_TA_FOOTBALL_DATA"
+# Lipeste AICI cheia ta de la RapidAPI (X-RapidAPI-Key):
+RAPIDAPI_KEY = "2ac6bb003amshea4487405e15e1fp18b95ejsn700b80898b4a"
 
-# Rute pentru fișierele din rădăcină
 @app.get("/")
 def read_index():
     return FileResponse("index.html")
@@ -31,45 +30,56 @@ def read_js():
     return FileResponse("app.js")
 
 @app.get("/api/matches")
-def get_football_data_matches():
-    url = "https://api.football-data.org/v4/competitions/PL/matches?status=SCHEDULED"
-    headers = {"X-Auth-Token": API_KEY}
+def get_sofascore_rapidapi_matches():
+    today = datetime.now().strftime("%Y-%m-%d")
+    
+    # Endpoint de la Sofascore ApiDojo pe RapidAPI pentru meciurile de azi
+    url = "https://sofascore3.p.rapidapi.com/matches/list-by-date"
+    
+    headers = {
+        "X-RapidAPI-Key": RAPIDAPI_KEY,
+        "X-RapidAPI-Host": "sofascore3.p.rapidapi.com"
+    }
+    
+    params = {"date": today}
     parsed_matches = []
     
     try:
-        response = requests.get(url, headers=headers)
-        print(f"Status Code Football-Data: {response.status_code}")
+        response = requests.get(url, headers=headers, params=params)
+        print(f"Status Code RapidAPI Sofascore: {response.status_code}")
         
         if response.status_code == 200:
             data = response.json()
-            matches = data.get("matches", [])
+            events = data.get("events", [])
             
-            for match in matches[:10]:
-                home_team = match.get("homeTeam", {}).get("name", "Gazde")
-                away_team = match.get("awayTeam", {}).get("name", "Oaspeți")
+            # Luăm primele 15 meciuri de azi
+            for event in events[:15]:
+                home_team = event.get("homeTeam", {}).get("name", "Gazde")
+                away_team = event.get("awayTeam", {}).get("name", "Oaspeți")
+                tournament = event.get("tournament", {}).get("name", "Fotbal")
                 
-                utc_date = match.get("utcDate")
-                if utc_date:
-                    dt = datetime.strptime(utc_date, "%Y-%m-%dT%H:%M:%SZ")
-                    match_time = dt.strftime("%d %b, %H:%M")
+                timestamp = event.get("startTimestamp")
+                if timestamp:
+                    match_time = datetime.fromtimestamp(timestamp).strftime("%H:%M")
                 else:
-                    match_time = "Curând"
+                    match_time = "Azi"
                 
                 parsed_matches.append({
-                    "datetime": match_time,
-                    "league": "premier-league",
+                    "datetime": f"Azi, {match_time}",
+                    "league": tournament,
                     "homeTeam": home_team,
                     "awayTeam": away_team,
-                    "odds1": "1.85",
-                    "oddsX": "3.50",
-                    "odds2": "4.10",
-                    "prediction": "Vic. Gazde",
+                    "odds1": "2.05",
+                    "oddsX": "3.25",
+                    "odds2": "3.60",
+                    "prediction": "1X",
                     "confidence": "Mare"
                 })
         else:
             print(f"Eroare API: {response.status_code} - {response.text}")
+            
     except Exception as e:
-        print(f"Excepție întâmpinată: {e}")
+        print(f"Excepție: {e}")
         
     return parsed_matches
 
