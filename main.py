@@ -16,7 +16,6 @@ app.add_middleware(
 
 RAPIDAPI_KEY = "2ac6bb003amshea4487405e15e1fp18b95ejsn700b80898b4a"
 
-# Cache pentru a nu depăși limita
 cached_matches = []
 last_fetch_time = None
 
@@ -37,14 +36,12 @@ def get_rapidapi_matches():
     global cached_matches, last_fetch_time
     now = datetime.now()
     
-    # Returnează din cache dacă au trecut mai puțin de 30 minute
     if last_fetch_time and (now - last_fetch_time).total_seconds() < 1800 and cached_matches:
         print("--> Returnăm datele salvate din cache.")
         return cached_matches
 
     today_str = now.strftime("%Y-%m-%d")
     
-    # URL & Headers din imaginea ta
     url = "https://api-football186.p.rapidapi.com/competition_matches_list"
     
     headers = {
@@ -54,7 +51,7 @@ def get_rapidapi_matches():
     
     querystring = {
         "date": today_str,
-        "timezone": "+03:00" # Fusul orar al României (EEST)
+        "timezone": "+03:00"
     }
     
     print(f"--> Apelăm API pentru data: {today_str}...")
@@ -66,17 +63,37 @@ def get_rapidapi_matches():
         
         if response.status_code == 200:
             data = response.json()
-            # Structura depinde de ce returnează API-ul (de obicei o listă sau obiect cu cheia 'result' / 'response')
-            matches = data if isinstance(data, list) else data.get("result", data.get("response", []))
-            print(f"--> Am primit date! Număr meciuri/competiții găsite: {len(matches)}")
             
-            # PARSARE MECIURI
-            for item in matches[:25]:
-                # Adaptăm în funcție de numelui câmpurilor
-                home_team = item.get("home_team_name", item.get("home", "Gazde"))
-                away_team = item.get("away_team_name", item.get("away", "Oaspeți"))
-                league_name = item.get("league_name", item.get("competition", "Fotbal"))
-                match_time = item.get("time", item.get("status", "Azi"))
+            # Printăm în consolă structura exactă primită pentru verificare
+            print("--> Structură răspuns primita:", type(data))
+            
+            # Identificare automată listă meciuri
+            raw_list = []
+            if isinstance(data, list):
+                raw_list = data
+            elif isinstance(data, dict):
+                # Căutăm lista în cheile comune
+                for key in ["data", "result", "response", "matches", "events"]:
+                    if key in data and isinstance(data[key], list):
+                        raw_list = data[key]
+                        break
+                # Dacă nu găsim o cheie cunoscută, luăm prima listă găsită în dicționar
+                if not raw_list:
+                    for val in data.values():
+                        if isinstance(val, list):
+                            raw_list = val
+                            break
+
+            print(f"--> Meciuri extrase din JSON: {len(raw_list)}")
+            
+            for item in raw_list[:25]:
+                if not isinstance(item, dict):
+                    continue
+                    
+                home_team = item.get("home_team_name", item.get("home_name", item.get("home", "Gazde")))
+                away_team = item.get("away_team_name", item.get("away_name", item.get("away", "Oaspeți")))
+                league_name = item.get("league_name", item.get("competition_name", item.get("competition", "Fotbal")))
+                match_time = item.get("time", item.get("match_time", item.get("status", "Azi")))
                 
                 parsed_matches.append({
                     "datetime": f"Azi, {match_time}",
@@ -96,7 +113,7 @@ def get_rapidapi_matches():
             print(f"--> Eroare API {response.status_code}: {response.text}")
             
     except Exception as e:
-        print(f"--> Excepție: {e}")
+        print(f"--> Excepție întâmpinată: {e}")
         
     return parsed_matches
 
