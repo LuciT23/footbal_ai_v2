@@ -5,7 +5,6 @@ from datetime import datetime
 
 app = FastAPI()
 
-# Permitem accesul din interfața Web
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -14,53 +13,60 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-def get_sofascore_matches():
-    # Endpoint-ul SofaScore pe care l-ai găsit
-    url = "https://www.sofascore.com/api/v1/unique-tournament/13470/scheduled-events/2026-07-29"
+# PUNE CHEIA TA API AICI ÎNTRE GHILIMELE:
+API_KEY = "PUNE_AICI_API_KEY_UL_TAU"
+
+@app.get("/api/matches")
+def get_football_data_matches():
+    # Preluăm meciurile viitoare din Premier League (PL)
+    # Alte coduri de ligi: 'PD' (La Liga), 'SA' (Serie A), 'BL1' (Bundesliga), 'CL' (Champions League)
+    url = "https://api.football-data.org/v4/competitions/PL/matches?status=SCHEDULED"
     
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "application/json, text/plain, */*"
+        "X-Auth-Token": API_KEY
     }
     
     parsed_matches = []
     
     try:
         response = requests.get(url, headers=headers)
+        print(f"Status Code Football-Data: {response.status_code}")
+        
         if response.status_code == 200:
             data = response.json()
-            events = data.get("events", [])
+            matches = data.get("matches", [])
             
-            for event in events:
-                home_team = event.get("homeTeam", {}).get("name", "Gazde")
-                away_team = event.get("awayTeam", {}).get("name", "Oaspeți")
+            # Preluăm primele 10 meciuri programate
+            for match in matches[:10]:
+                home_team = match.get("homeTeam", {}).get("name", "Gazde")
+                away_team = match.get("awayTeam", {}).get("name", "Oaspeți")
                 
-                # Formatare oră meci
-                timestamp = event.get("startTimestamp")
-                match_time = datetime.fromtimestamp(timestamp).strftime("%H:%M") if timestamp else "Azi"
+                # Formatare dată și oră
+                utc_date = match.get("utcDate")
+                if utc_date:
+                    dt = datetime.strptime(utc_date, "%Y-%m-%dT%H:%M:%SZ")
+                    match_time = dt.strftime("%d %b, %H:%M")
+                else:
+                    match_time = "Curând"
                 
                 parsed_matches.append({
-                    "datetime": f"Azi, {match_time}",
+                    "datetime": match_time,
                     "league": "premier-league",
                     "homeTeam": home_team,
                     "awayTeam": away_team,
-                    "odds1": "1.95", # Cotele pot fi extrase separat per meci
-                    "oddsX": "3.40",
-                    "odds2": "3.80",
-                    "prediction": "Vic. Gazde",
+                    "odds1": "1.85", # Punct de extindere pentru cote
+                    "oddsX": "3.50",
+                    "odds2": "4.10",
+                    "prediction": "1 (Vic. Gazde)",
                     "confidence": "Mare"
                 })
         else:
-            print(f"Eroare API SofaScore: {response.status_code}")
+            print(f"Eroare API: {response.status_code} - {response.text}")
+            
     except Exception as e:
         print(f"Excepție întâmpinată: {e}")
         
     return parsed_matches
-
-@app.get("/api/matches")
-def get_matches():
-    # Trimite meciurile din API-ul SofaScore către Frontend
-    return get_sofascore_matches()
 
 if __name__ == "__main__":
     import uvicorn
