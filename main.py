@@ -23,7 +23,7 @@ def get_football_data_matches():
     url = "https://api.football-data.org/v4/competitions/PL/matches?status=SCHEDULED"
     
     headers = {
-        "X-Auth-Token": API_KEY
+        "X-Auth-Token": 59b1d7e200f549c9a4bd4fe4d243c565
     }
     
     parsed_matches = []
