@@ -14,10 +14,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Pune AICI cheia ta unică de pe RapidAPI:
-RAPIDAPI_KEY = "PUNE_AICI_CHEIA_TA_RAPIDAPI"
+RAPIDAPI_KEY = "2ac6bb003amshea4487405e15e1fp18b95ejsn700b80898b4a"
 
-# Memorie Cache pentru a economisi din limita de cereri
+# Cache pentru a nu depăși limita
 cached_matches = []
 last_fetch_time = None
 
@@ -34,57 +33,50 @@ def read_js():
     return FileResponse("app.js")
 
 @app.get("/api/matches")
-def get_api_football_matches():
+def get_rapidapi_matches():
     global cached_matches, last_fetch_time
-    
     now = datetime.now()
     
-    # Dacă avem meciuri salvate mai noi de 30 de minute (1800 secunde), le returnăm pe cele din memorie
+    # Returnează din cache dacă au trecut mai puțin de 30 minute
     if last_fetch_time and (now - last_fetch_time).total_seconds() < 1800 and cached_matches:
-        print("--> Returnăm datele salvate din cache (fără request la API).")
+        print("--> Returnăm datele salvate din cache.")
         return cached_matches
 
-    # Altfe, facem o cerere nouă către API-FOOTBALL
     today_str = now.strftime("%Y-%m-%d")
-    url = "https://api-football-v1.p.rapidapi.com/v3/fixtures"
+    
+    # URL & Headers din imaginea ta
+    url = "https://api-football186.p.rapidapi.com/competition_matches_list"
     
     headers = {
-        "X-RapidAPI-Key": RAPIDAPI_KEY,
-        "X-RapidAPI-Host": "api-football-v1.p.rapidapi.com"
+        "x-rapidapi-key": RAPIDAPI_KEY,
+        "x-rapidapi-host": "api-football186.p.rapidapi.com"
     }
     
-    params = {"date": today_str}
+    querystring = {
+        "date": today_str,
+        "timezone": "+03:00" # Fusul orar al României (EEST)
+    }
     
-    print(f"--> Facem un request nou către API-FOOTBALL pentru data: {today_str}...")
-    
+    print(f"--> Apelăm API pentru data: {today_str}...")
     parsed_matches = []
     
     try:
-        response = requests.get(url, headers=headers, params=params)
-        print(f"--> Status Code API-Football: {response.status_code}")
+        response = requests.get(url, headers=headers, params=querystring)
+        print(f"--> Status Code API: {response.status_code}")
         
         if response.status_code == 200:
             data = response.json()
-            fixtures = data.get("response", [])
-            print(f"--> Am găsit {len(fixtures)} meciuri pentru azi!")
+            # Structura depinde de ce returnează API-ul (de obicei o listă sau obiect cu cheia 'result' / 'response')
+            matches = data if isinstance(data, list) else data.get("result", data.get("response", []))
+            print(f"--> Am primit date! Număr meciuri/competiții găsite: {len(matches)}")
             
-            # Luăm primele 25 de meciuri de azi
-            for item in fixtures[:25]:
-                fixture = item.get("fixture", {})
-                teams = item.get("teams", {})
-                league = item.get("league", {})
-                
-                home_team = teams.get("home", {}).get("name", "Gazde")
-                away_team = teams.get("away", {}).get("name", "Oaspeți")
-                league_name = league.get("name", "Fotbal")
-                
-                date_str = fixture.get("date")
-                if date_str:
-                    # Formatare oră meci (ex: 19:45)
-                    dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
-                    match_time = dt.strftime("%H:%M")
-                else:
-                    match_time = "Azi"
+            # PARSARE MECIURI
+            for item in matches[:25]:
+                # Adaptăm în funcție de numelui câmpurilor
+                home_team = item.get("home_team_name", item.get("home", "Gazde"))
+                away_team = item.get("away_team_name", item.get("away", "Oaspeți"))
+                league_name = item.get("league_name", item.get("competition", "Fotbal"))
+                match_time = item.get("time", item.get("status", "Azi"))
                 
                 parsed_matches.append({
                     "datetime": f"Azi, {match_time}",
@@ -98,15 +90,13 @@ def get_api_football_matches():
                     "confidence": "Mare"
                 })
                 
-            # Salvăm datele în cache
             cached_matches = parsed_matches
             last_fetch_time = now
-            
         else:
-            print(f"--> Eroare API: {response.status_code} - {response.text}")
+            print(f"--> Eroare API {response.status_code}: {response.text}")
             
     except Exception as e:
-        print(f"--> Excepție întâmpinată: {e}")
+        print(f"--> Excepție: {e}")
         
     return parsed_matches
 
