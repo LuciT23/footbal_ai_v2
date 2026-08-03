@@ -234,25 +234,25 @@ def get_rapidapi_matches():
             matches_found = []
           
                         # 1. Funcția actualizată care păstrează numele ligii 
-            def extract_matches(obj, current_league="Fotbal Generat"):
+            def extract_matches(obj, current_league="Fotbal Generat"): 
+                # Dacă e listă, mergem mai adânc
                 if isinstance(obj, list):
                     for item in obj:
                         extract_matches(item, current_league)
+                # Dacă e dict, verificăm dacă are un nume de ligă
                 elif isinstance(obj, dict):
-                    # Dacă am găsit un meci, îi atașăm liga curentă
+                    # ÎNCERCĂM SĂ GĂSIM NUMELE LIGII
+                    found_league = obj.get("cname") or obj.get("competition_name") or obj.get("competition", {}).get("name") or current_league
+                    
+                    # Dacă e un meci (are "teams"), îl salvăm cu liga găsită
                     if "teams" in obj:
-                        obj["league_name_found"] = current_league 
+                        obj["league_name_found"] = found_league
                         matches_found.append(obj)
                     else:
-                        # Dacă nu e meci, verificăm dacă este o cheie (nume de ligă) care conține o listă
+                        # Dacă nu e meci, continuăm recursiv cu noul nume de ligă găsit
                         for key, val in obj.items():
-                            # Excludem cheile API care nu sunt ligi
-                            if key not in ["response", "data", "matches", "competition"]:
-                                new_league = key
-                            else:
-                                new_league = current_league
-                            extract_matches(val, new_league)
-            
+                            extract_matches(val, found_league)
+
             # Apelăm funcția
             extract_matches(data)
 
