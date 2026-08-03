@@ -20,9 +20,35 @@ app.add_middleware(
 RAPIDAPI_KEY = "2ac6bb003amshea4487405e15e1fp18b95ejsn700b80898b4a"
 
 # ==============================================================================
+# LISTA DE LIGI PERMISE (WHITELIST)
+# Filtru pentru eliminarea ligilor inferioare / neimportante
+# ==============================================================================
+ALLOWED_LEAGUES = [
+    # Top Campionate & Ligi Europene
+    "premier league", "la liga", "serie a", "bundesliga", "ligue 1",
+    "championship", "2. bundesliga", "serie b", "segunda division",
+    "eredivisie", "liga portugal", "pro league", "super lig", "premiership", 
+    "Superliga",
+    
+    # România
+    "liga 1", "superliga", "liga i",
+    
+    # Cupe Europene & Internaționale
+    "champions league", "europa league", "conference league", "nations league",
+    
+    # America de Sud & Altele populare
+    "brasileiro", "serie a brazil", "copa libertadores", "copa sudamericana", "mls"
+]
+
+
+# ==============================================================================
 # 1. FUNCTIA DE MEMORIE & ÎNVĂȚARE (CITIRE DIN ISTORIC_INVATARE.CSV)
 # ==============================================================================
 def load_league_confidence_thresholds():
+    """
+    Citește istoric_invatare.csv și calculează procentul de câștig per ligă.
+    Dacă o ligă are rată de succes > 70%, ajustăm pragul pentru 'Confidence Mare'.
+    """
     file_path = "istoric_invatare.csv"
     if not os.path.exists(file_path):
         return {}
@@ -58,27 +84,37 @@ def load_league_confidence_thresholds():
 
 
 # ==============================================================================
-# 2. MOTORUL DE DECIZIE AI
+# 2. MOTORUL DE DECIZIE AI (CALCUL PRONOSTIC BAZAT PE STATISTICI)
 # ==============================================================================
 def calculate_ai_prediction(p_15, p_25, p_gg, p_ht, o1, o2):
+    """
+    Stabilește cel mai bun pronostic analizând probabilitățile statistice, 
+    nu doar cotele 1X2.
+    """
     float_o1 = float(o1)
     float_o2 = float(o2)
 
+    # 1. Meci clar de goluri multe
     if p_25 >= 72.0 and p_gg >= 60.0:
         return "Peste 2.5"
     
+    # 2. Ambele echipe marchează
     if p_gg >= 68.0:
         return "GG"
 
+    # 3. Favorită clară acasă
     if float_o1 <= 1.65 or (p_ht >= 80.0 and float_o1 < 2.10):
         return "1"
 
+    # 4. Favorită clară în deplasare
     if float_o2 <= 1.65:
         return "2"
 
+    # 5. Meci moderat de goluri (Cel mai sigur din punct de vedere statistic)
     if p_15 >= 75.0:
         return "Peste 1.5"
 
+    # 6. Default: Șansă dublă acoperită
     return "1X" if float_o1 <= float_o2 else "X2"
 
 
@@ -86,6 +122,9 @@ def calculate_ai_prediction(p_15, p_25, p_gg, p_ht, o1, o2):
 # 3. SALVARE AUTOMATĂ MECIURI ÎN MECIURI_AZI.CSV
 # ==============================================================================
 def save_matches_to_csv(matches):
+    """
+    Salvează meciurile filtrate de azi în meciuri_azi.csv pentru verificarea ulterioară.
+    """
     file_path = "meciuri_azi.csv"
     file_exists = os.path.exists(file_path)
 
@@ -166,6 +205,7 @@ def read_js():
 def get_rapidapi_matches():
     global cached_matches, last_fetch_time
    
+    # 1. Citim istoricul de învățare per ligă
     league_accuracy = load_league_confidence_thresholds()
    
     now = datetime.now()
@@ -193,21 +233,44 @@ def get_rapidapi_matches():
             data = response.json()
             matches_found = []
           
-            def extract_matches(obj):
+                        # 1. Funcția actualizată care păstrează numele ligii 
+            def extract_matches(obj, current_league="Fotbal Generat"):
                 if isinstance(obj, list):
                     for item in obj:
-                        extract_matches(item)
+                        extract_matches(item, current_league)
                 elif isinstance(obj, dict):
-                    if "teams" in obj or "home" in obj or "homeTeam" in obj:
+                    # Dacă am găsit un meci, îi atașăm liga curentă
+                    if "teams" in obj:
+                        obj["league_name_found"] = current_league 
                         matches_found.append(obj)
                     else:
-                        for val in obj.values():
-                            extract_matches(val)
-
+                        # Dacă nu e meci, verificăm dacă este o cheie (nume de ligă) care conține o listă
+                        for key, val in obj.items():
+                            # Excludem cheile API care nu sunt ligi
+                            if key not in ["response", "data", "matches", "competition"]:
+                                new_league = key
+                            else:
+                                new_league = current_league
+                            extract_matches(val, new_league)
+            
+            # Apelăm funcția
             extract_matches(data)
+
             print(f"--> S-au identificat {len(matches_found)} meciuri brute în JSON-ul API-ului.")
           
             for item in matches_found:
+                # Extragere Ligă
+                league_name = item.get("league_name_found","Fotbal Generat")
+
+                #Debug
+                print(f"DEBUG: Verific liga: '{league_name}'")
+                
+                # FILTRARE WHITELIST (LIGI PERMISE)
+                league_lower = str(league_name).lower()
+                if not any(allowed in league_lower for allowed in ALLOWED_LEAGUES):
+                    continue
+
+                # Extragere Echipe
                 teams = item.get("teams", {})
                 if isinstance(teams, dict):
                     home_team = teams.get("home", {}).get("tname") or teams.get("home", {}).get("name") or item.get("homeTeam", "Gazde")
@@ -219,23 +282,20 @@ def get_rapidapi_matches():
                 home_str = str(home_team)
                 away_str = str(away_team)
 
+                # Excludem meciurile de tineret sau rezervă
                 if any(p in home_str.lower() or p in away_str.lower() for p in [" ii", " 2", " b ", " u21", " u19"]):
                     continue
-
-                league_name = (
-                    item.get("cname") or
-                    item.get("competition_name") or
-                    (item.get("competition", {}).get("name") if isinstance(item.get("competition"), dict) else "Fotbal Generat")
-                )
 
                 date_start = item.get("datestart", "")
                 match_time = date_start.split(" ")[1][:5] if " " in date_start and len(date_start.split(" ")) > 1 else "19:00"
               
+                # Extragere/Generare Cote Dinamice
                 odds_data = item.get("odds", {})
                 o1 = odds_data.get("1") or f"{round(random.uniform(1.40, 3.20), 2):.2f}"
                 ox = odds_data.get("X") or f"{round(random.uniform(3.10, 4.10), 2):.2f}"
                 o2 = odds_data.get("2") or f"{round(random.uniform(1.80, 4.80), 2):.2f}"
                
+                # Generare Statistici Deterministice (Seed per meci)
                 seed_val = sum(ord(c) for c in (home_str + away_str))
                 rng = random.Random(seed_val)
                 p_15 = round(rng.uniform(62.0, 91.0), 2)
@@ -243,8 +303,10 @@ def get_rapidapi_matches():
                 p_ht = round(rng.uniform(55.0, 88.0), 2)
                 p_gg = round(rng.uniform(38.0, 72.0), 2)
 
+                # Calcul Pronostic Inteligent
                 pred = calculate_ai_prediction(p_15, p_25, p_gg, p_ht, o1, o2)
 
+                # Calcul Încredere
                 acc = league_accuracy.get(str(league_name), 50.0)
                 if acc >= 70.0 or p_15 >= 80.0 or float(o1) <= 1.65:
                     conf = "Mare"
@@ -267,9 +329,9 @@ def get_rapidapi_matches():
               
             cached_matches = parsed_matches
             last_fetch_time = now
-            print(f"--> Total meciuri procesate și afișate: {len(parsed_matches)}")
+            print(f"--> Total meciuri relevante procesate și afișate: {len(parsed_matches)}")
             
-            # SALVĂM AUTOMAT MECIURILE ÎN CSV
+            # SALVARE AUTOMATĂ
             save_matches_to_csv(parsed_matches)
 
         else:
