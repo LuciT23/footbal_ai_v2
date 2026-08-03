@@ -31,12 +31,11 @@ def read_css():
 def read_js():
     return FileResponse("app.js")
 
-@app.get("/api/matches")
+@app.get("/api/matches") 
 def get_rapidapi_matches():
     global cached_matches, last_fetch_time
     now = datetime.now()
     
-    # Caching 30 minute
     if last_fetch_time and (now - last_fetch_time).total_seconds() < 1800 and cached_matches:
         print("--> Returnăm datele salvate din cache.")
         return cached_matches
@@ -45,7 +44,7 @@ def get_rapidapi_matches():
     url = "https://api-football186.p.rapidapi.com/competition_matches_list"
     
     headers = {
-        "x-rapidapi-key": "2ac6bb003amshea4487405e15e1fp18b95ejsn700b80898b4a",
+        "x-rapidapi-key": RAPIDAPI_KEY,
         "x-rapidapi-host": "api-football186.p.rapidapi.com"
     }
     
@@ -56,6 +55,14 @@ def get_rapidapi_matches():
     
     print(f"--> Apelăm API pentru data: {today_str}...")
     parsed_matches = []
+    
+    # Lista de cuvinte cheie pentru ligile de top pe care le vrem în aplicație
+    TOP_LEAGUES_KEYWORDS = [
+        "romania", "superliga", "liga i", "cupa romaniei",
+        "champions league", "europa league", "conference league", "uefa",
+        "premier league", "la liga", "serie a", "bundesliga", "ligue 1",
+        "eredivisie", "primeira liga", "pro league", "super lig"
+    ]
     
     try:
         response = requests.get(url, headers=headers, params=querystring)
@@ -77,26 +84,36 @@ def get_rapidapi_matches():
                             extract_matches(val)
 
             extract_matches(data)
-            print(f"--> Meciuri identificate: {len(matches_found)}")
             
-            for item in matches_found[:30]:
+            for item in matches_found:
                 teams = item.get("teams", {})
-                
-                # Extragere nume echipe
                 home_team = teams.get("home", {}).get("tname", "Gazde")
                 away_team = teams.get("away", {}).get("tname", "Oaspeți")
                 
-                # Extragere ora/data
-                date_start = item.get("datestart", "")
-                if " " in date_start:
-                    match_time = date_start.split(" ")[1][:5] # Extrage doar HH:MM
-                else:
-                    match_time = item.get("time", "Azi")
+                league_name = (
+                    item.get("cname") or 
+                    (item.get("competition", {}).get("name") if isinstance(item.get("competition"), dict) else "Fotbal")
+                )
                 
-                # Cotele standard/generice pentru prezentare
-                parsed_matches.append({
+                league_lower = str(league_name).lower()
+                
+                # Excludem explicit ligile secundare/secundare din Brazilia/alte țări dacă conțin "serie b", "2", "division 2"
+                if "serie b" in league_lower or "liga 2" in league_lower or "2. bundesliga" in league_lower:
+                    continue
+                
+                # Verificăm dacă liga face parte din cele de top doriți
+                is_top_league = any(kw in league_lower for kw in TOP_LEAGUES_KEYWORDS)
+                
+                # Dacă nu e în lista de top, o ignorăm pentru a păstra lista curată
+                if not is_top_league:
+                    continue
+
+                date_start = item.get("datestart", "")
+                match_time = date_start.split(" ")[1][:5] if " " in date_start else "Azi"
+                
+                match_data = {
                     "datetime": f"Azi, {match_time}",
-                    "league": "Fotbal",
+                    "league": str(league_name),
                     "homeTeam": home_team,
                     "awayTeam": away_team,
                     "odds1": "2.10",
@@ -104,11 +121,17 @@ def get_rapidapi_matches():
                     "odds2": "3.50",
                     "prediction": "1X",
                     "confidence": "Mare"
-                })
+                }
+                
+                # Prioritizare: România & UEFA la începutul listei
+                if any(k in league_lower for k in ["romania", "superliga", "liga i", "uefa", "champions", "europa"]):
+                    parsed_matches.insert(0, match_data)
+                else:
+                    parsed_matches.append(match_data)
                 
             cached_matches = parsed_matches
             last_fetch_time = now
-            print(f"--> Am procesat cu succes {len(parsed_matches)} meciuri reale!")
+            print(f"--> Am filtrat și încărcat {len(parsed_matches)} meciuri importante!")
         else:
             print(f"--> Eroare API {response.status_code}: {response.text}")
             
@@ -116,6 +139,7 @@ def get_rapidapi_matches():
         print(f"--> Excepție întâmpinată: {e}")
         
     return parsed_matches
+
 
 if __name__ == "__main__":
     import uvicorn
