@@ -9,7 +9,6 @@ from fastapi.responses import FileResponse
 
 app = FastAPI(title="Football AI Prediction API")
 
-# Permitem cereri CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -24,10 +23,6 @@ RAPIDAPI_KEY = "2ac6bb003amshea4487405e15e1fp18b95ejsn700b80898b4a"
 # 1. FUNCTIA DE MEMORIE & ÎNVĂȚARE (CITIRE DIN ISTORIC_INVATARE.CSV)
 # ==============================================================================
 def load_league_confidence_thresholds():
-    """
-    Citește istoric_invatare.csv și calculează procentul de câștig per ligă.
-    Dacă o ligă are rată de succes > 70%, ajustăm pragul pentru 'Confidence Mare'.
-    """
     file_path = "istoric_invatare.csv"
     if not os.path.exists(file_path):
         return {}
@@ -63,45 +58,93 @@ def load_league_confidence_thresholds():
 
 
 # ==============================================================================
-# 2. MOTORUL DE DECIZIE AI (CALCUL PRONOSTIC BAZAT PE STATISTICI)
+# 2. MOTORUL DE DECIZIE AI
 # ==============================================================================
 def calculate_ai_prediction(p_15, p_25, p_gg, p_ht, o1, o2):
-    """
-    Stabilește cel mai bun pronostic analizând probabilitățile statistice, 
-    nu doar cotele 1X2.
-    """
     float_o1 = float(o1)
     float_o2 = float(o2)
 
-    # 1. Meci clar de goluri multe
     if p_25 >= 72.0 and p_gg >= 60.0:
         return "Peste 2.5"
     
-    # 2. Ambele echipe marchează
     if p_gg >= 68.0:
         return "GG"
 
-    # 3. Favorită clară acasă (Dominanță în prima repriză + cotă bună)
     if float_o1 <= 1.65 or (p_ht >= 80.0 and float_o1 < 2.10):
         return "1"
 
-    # 4. Favorită clară în deplasare
     if float_o2 <= 1.65:
         return "2"
 
-    # 5. Meci moderat de goluri (Cel mai sigur din punct de vedere statistic)
     if p_15 >= 75.0:
         return "Peste 1.5"
 
-    # 6. Default: Șansă dublă acoperită
     return "1X" if float_o1 <= float_o2 else "X2"
+
+
+# ==============================================================================
+# 3. SALVARE AUTOMATĂ MECIURI ÎN MECIURI_AZI.CSV
+# ==============================================================================
+def save_matches_to_csv(matches):
+    file_path = "meciuri_azi.csv"
+    file_exists = os.path.exists(file_path)
+
+    existing_keys = set()
+    if file_exists:
+        try:
+            with open(file_path, mode="r", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    key = f"{row.get('data')}_{row.get('liga')}_{row.get('echipa_gazda')}_{row.get('echipa_oaspete')}"
+                    existing_keys.add(key)
+        except Exception as e:
+            print(f"--> Eroare la citirea meciuri_azi.csv: {e}")
+
+    today_str = datetime.now().strftime("%Y-%m-%d")
+
+    try:
+        with open(file_path, mode="a", newline="", encoding="utf-8") as f:
+            fieldnames = ["data", "liga", "echipa_gazda", "echipa_oaspete", "pronostic", "cota", "status"]
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+
+            if not file_exists:
+                writer.writeheader()
+
+            added_count = 0
+            for m in matches:
+                key = f"{today_str}_{m['league']}_{m['homeTeam']}_{m['awayTeam']}"
+                if key not in existing_keys:
+                    pred = m['prediction']
+                    if pred == "1":
+                        cota = m['odds1']
+                    elif pred == "2":
+                        cota = m['odds2']
+                    else:
+                        cota = m['oddsX']
+
+                    writer.writerow({
+                        "data": today_str,
+                        "liga": m['league'],
+                        "echipa_gazda": m['homeTeam'],
+                        "echipa_oaspete": m['awayTeam'],
+                        "pronostic": pred,
+                        "cota": cota,
+                        "status": "PENDING"
+                    })
+                    existing_keys.add(key)
+                    added_count += 1
+
+            if added_count > 0:
+                print(f"--> [AUTO-SAVE] S-au salvat {added_count} meciuri noi în 'meciuri_azi.csv'.")
+    except Exception as e:
+        print(f"--> Eroare la salvarea în meciuri_azi.csv: {e}")
 
 
 cached_matches = []
 last_fetch_time = None
 
 # ==============================================================================
-# FIȘIERE STATICE / RUTE INDEX
+# RUTE FIȘIERE STATICE
 # ==============================================================================
 @app.get("/")
 def read_index():
@@ -123,7 +166,6 @@ def read_js():
 def get_rapidapi_matches():
     global cached_matches, last_fetch_time
    
-    # 1. Citim istoricul de invatare din CSV per liga
     league_accuracy = load_league_confidence_thresholds()
    
     now = datetime.now()
@@ -166,7 +208,6 @@ def get_rapidapi_matches():
             print(f"--> S-au identificat {len(matches_found)} meciuri brute în JSON-ul API-ului.")
           
             for item in matches_found:
-                # 1. Extragere Echipe
                 teams = item.get("teams", {})
                 if isinstance(teams, dict):
                     home_team = teams.get("home", {}).get("tname") or teams.get("home", {}).get("name") or item.get("homeTeam", "Gazde")
@@ -178,11 +219,9 @@ def get_rapidapi_matches():
                 home_str = str(home_team)
                 away_str = str(away_team)
 
-                # Excludem echipele secundare (ex: Earthquakes II)
                 if any(p in home_str.lower() or p in away_str.lower() for p in [" ii", " 2", " b ", " u21", " u19"]):
                     continue
 
-                # 2. Extragere Ligă
                 league_name = (
                     item.get("cname") or
                     item.get("competition_name") or
@@ -192,13 +231,11 @@ def get_rapidapi_matches():
                 date_start = item.get("datestart", "")
                 match_time = date_start.split(" ")[1][:5] if " " in date_start and len(date_start.split(" ")) > 1 else "19:00"
               
-                # 3. Extragere/Generare Cote Dinamice
                 odds_data = item.get("odds", {})
                 o1 = odds_data.get("1") or f"{round(random.uniform(1.40, 3.20), 2):.2f}"
                 ox = odds_data.get("X") or f"{round(random.uniform(3.10, 4.10), 2):.2f}"
                 o2 = odds_data.get("2") or f"{round(random.uniform(1.80, 4.80), 2):.2f}"
                
-                # 4. Generare Statistici Deterministice (Seed per meci)
                 seed_val = sum(ord(c) for c in (home_str + away_str))
                 rng = random.Random(seed_val)
                 p_15 = round(rng.uniform(62.0, 91.0), 2)
@@ -206,10 +243,8 @@ def get_rapidapi_matches():
                 p_ht = round(rng.uniform(55.0, 88.0), 2)
                 p_gg = round(rng.uniform(38.0, 72.0), 2)
 
-                # 5. Calculare Pronostic Inteligent (AI Prediction)
                 pred = calculate_ai_prediction(p_15, p_25, p_gg, p_ht, o1, o2)
 
-                # 6. Calculare Încredere bazată pe Istoricul Ligii din CSV
                 acc = league_accuracy.get(str(league_name), 50.0)
                 if acc >= 70.0 or p_15 >= 80.0 or float(o1) <= 1.65:
                     conf = "Mare"
@@ -233,6 +268,10 @@ def get_rapidapi_matches():
             cached_matches = parsed_matches
             last_fetch_time = now
             print(f"--> Total meciuri procesate și afișate: {len(parsed_matches)}")
+            
+            # SALVĂM AUTOMAT MECIURILE ÎN CSV
+            save_matches_to_csv(parsed_matches)
+
         else:
             print(f"--> Eroare API {response.status_code}: {response.text}")
           
@@ -247,10 +286,6 @@ def get_rapidapi_matches():
 # ==============================================================================
 @app.get("/api/match-analytics")
 def get_match_analytics(home: str, away: str):
-    """
-    Generăm procentaje unice și dinamice pentru fiecare meci în parte,
-    folosind numele echipelor ca 'seed'.
-    """
     seed_val = sum(ord(c) for c in (home + away))
     rng = random.Random(seed_val)
   
