@@ -21,7 +21,7 @@ app.add_middleware(
 RAPIDAPI_KEY = "2ac6bb003amshea4487405e15e1fp18b95ejsn700b80898b4a"
 
 # ==============================================================================
-# FUNCTIA DE MEMORIE & ÎNVĂȚARE (CITIRE DIN ISTORIC_INVATARE.CSV)
+# 1. FUNCTIA DE MEMORIE & ÎNVĂȚARE (CITIRE DIN ISTORIC_INVATARE.CSV)
 # ==============================================================================
 def load_league_confidence_thresholds():
     """
@@ -62,6 +62,41 @@ def load_league_confidence_thresholds():
         return {}
 
 
+# ==============================================================================
+# 2. MOTORUL DE DECIZIE AI (CALCUL PRONOSTIC BAZAT PE STATISTICI)
+# ==============================================================================
+def calculate_ai_prediction(p_15, p_25, p_gg, p_ht, o1, o2):
+    """
+    Stabilește cel mai bun pronostic analizând probabilitățile statistice, 
+    nu doar cotele 1X2.
+    """
+    float_o1 = float(o1)
+    float_o2 = float(o2)
+
+    # 1. Meci clar de goluri multe
+    if p_25 >= 72.0 and p_gg >= 60.0:
+        return "Peste 2.5"
+    
+    # 2. Ambele echipe marchează
+    if p_gg >= 68.0:
+        return "GG"
+
+    # 3. Favorită clară acasă (Dominanță în prima repriză + cotă bună)
+    if float_o1 <= 1.65 or (p_ht >= 80.0 and float_o1 < 2.10):
+        return "1"
+
+    # 4. Favorită clară în deplasare
+    if float_o2 <= 1.65:
+        return "2"
+
+    # 5. Meci moderat de goluri (Cel mai sigur din punct de vedere statistic)
+    if p_15 >= 75.0:
+        return "Peste 1.5"
+
+    # 6. Default: Șansă dublă acoperită
+    return "1X" if float_o1 <= float_o2 else "X2"
+
+
 cached_matches = []
 last_fetch_time = None
 
@@ -87,35 +122,35 @@ def read_js():
 @app.get("/api/matches")
 def get_rapidapi_matches():
     global cached_matches, last_fetch_time
-    
+   
     # 1. Citim istoricul de invatare din CSV per liga
     league_accuracy = load_league_confidence_thresholds()
-    
+   
     now = datetime.now()
     today_str = now.strftime("%Y-%m-%d")
     url = "https://api-football186.p.rapidapi.com/competition_matches_list"
-   
+  
     headers = {
         "x-rapidapi-key": RAPIDAPI_KEY,
         "x-rapidapi-host": "api-football186.p.rapidapi.com"
     }
-   
+  
     querystring = {
         "date": today_str,
         "timezone": "+03:00"
     }
-   
+  
     print(f"--> Apelăm API pentru data: {today_str}...")
     parsed_matches = []
-   
+  
     try:
         response = requests.get(url, headers=headers, params=querystring)
         print(f"--> Status Code API: {response.status_code}")
-       
+      
         if response.status_code == 200:
             data = response.json()
             matches_found = []
-           
+          
             def extract_matches(obj):
                 if isinstance(obj, list):
                     for item in obj:
@@ -129,7 +164,7 @@ def get_rapidapi_matches():
 
             extract_matches(data)
             print(f"--> S-au identificat {len(matches_found)} meciuri brute în JSON-ul API-ului.")
-           
+          
             for item in matches_found:
                 # 1. Extragere Echipe
                 teams = item.get("teams", {})
@@ -156,26 +191,27 @@ def get_rapidapi_matches():
 
                 date_start = item.get("datestart", "")
                 match_time = date_start.split(" ")[1][:5] if " " in date_start and len(date_start.split(" ")) > 1 else "19:00"
-               
+              
                 # 3. Extragere/Generare Cote Dinamice
                 odds_data = item.get("odds", {})
                 o1 = odds_data.get("1") or f"{round(random.uniform(1.40, 3.20), 2):.2f}"
                 ox = odds_data.get("X") or f"{round(random.uniform(3.10, 4.10), 2):.2f}"
                 o2 = odds_data.get("2") or f"{round(random.uniform(1.80, 4.80), 2):.2f}"
-                
-                # 4. Calculare Pronostic
-                float_o1 = float(o1)
-                float_o2 = float(o2)
-                if float_o1 < 1.80:
-                    pred = "1"
-                elif float_o2 < 1.80:
-                    pred = "2"
-                else:
-                    pred = "1X" if float_o1 <= float_o2 else "X2"
+               
+                # 4. Generare Statistici Deterministice (Seed per meci)
+                seed_val = sum(ord(c) for c in (home_str + away_str))
+                rng = random.Random(seed_val)
+                p_15 = round(rng.uniform(62.0, 91.0), 2)
+                p_25 = round(rng.uniform(42.0, 78.0), 2)
+                p_ht = round(rng.uniform(55.0, 88.0), 2)
+                p_gg = round(rng.uniform(38.0, 72.0), 2)
 
-                # 5. Calculare Încredere bazată pe Istoricul Ligii din CSV
+                # 5. Calculare Pronostic Inteligent (AI Prediction)
+                pred = calculate_ai_prediction(p_15, p_25, p_gg, p_ht, o1, o2)
+
+                # 6. Calculare Încredere bazată pe Istoricul Ligii din CSV
                 acc = league_accuracy.get(str(league_name), 50.0)
-                if acc >= 70.0 or float_o1 <= 1.70:
+                if acc >= 70.0 or p_15 >= 80.0 or float(o1) <= 1.65:
                     conf = "Mare"
                 else:
                     conf = "Mediu"
@@ -191,18 +227,18 @@ def get_rapidapi_matches():
                     "prediction": pred,
                     "confidence": conf
                 }
-               
+              
                 parsed_matches.append(match_data)
-               
+              
             cached_matches = parsed_matches
             last_fetch_time = now
             print(f"--> Total meciuri procesate și afișate: {len(parsed_matches)}")
         else:
             print(f"--> Eroare API {response.status_code}: {response.text}")
-           
+          
     except Exception as e:
         print(f"--> Excepție întâmpinată: {e}")
-       
+      
     return parsed_matches
 
 
@@ -217,7 +253,7 @@ def get_match_analytics(home: str, away: str):
     """
     seed_val = sum(ord(c) for c in (home + away))
     rng = random.Random(seed_val)
-   
+  
     p_15 = round(rng.uniform(62.0, 91.0), 2)
     p_25 = round(rng.uniform(42.0, 78.0), 2)
     p_ht = round(rng.uniform(55.0, 88.0), 2)
@@ -245,7 +281,7 @@ def get_match_analytics(home: str, away: str):
             {"label": "Peste 9.5 Cornere", "val": p_corners, "color": get_color(p_corners)}
         ]
     }
-   
+  
     return analytics
 
 
