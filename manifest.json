@@ -1,0 +1,15 @@
+{ 
+  "name": "Football AI",
+  "short_name": "FootballAI",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#121212",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/53/53283.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
