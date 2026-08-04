@@ -192,7 +192,11 @@ def read_css():
 @app.get("/app.js")
 def read_js():
     return FileResponse("app.js")
-
+    
+@app.get("manifest.json")
+def read_manifest():
+    return FileResponse("manifest.json")
+    
 # ==============================================================================
 # ENDPOINT: LISTA MECIURI (ADAPTAT PENTRU LIVESCORE API)
 # ==============================================================================
