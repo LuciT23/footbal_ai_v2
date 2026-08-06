@@ -2,7 +2,7 @@ import os
 import csv
 import random
 import requests
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -205,8 +205,9 @@ def get_rapidapi_matches():
     global cached_matches, last_fetch_time
    
     league_accuracy = load_league_confidence_thresholds()
-   
-    now = datetime.now()
+
+    romania_tz = timezone(timedelta(hours=3))
+    now = datetime.now(romania_tz)
     today_str = now.strftime("%Y-%m-%d")
     url = "https://livescore6.p.rapidapi.com/matches/v2/list-by-date"
 
