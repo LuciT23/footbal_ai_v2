@@ -10,7 +10,9 @@ let currentMatches = [];
 async function fetchMatchesFromAPI() {
     try {
         // Preluăm datele de la endpoint-ul FastAPI
-        const response = await fetch('/api/matches');
+        const response = await fetch('/api/matches?t=${Date.now()}' 
+    
+    );
        
         if (!response.ok) {
             throw new Error(`Eroare HTTP! status: ${response.status}`);
@@ -54,9 +56,6 @@ function renderMatches(matches) {
             <tr style="cursor: pointer;" onclick="openMatchStats('${homeEscaped}', '${awayEscaped}')">
                 <td>${match.datetime}</td>
                 <td><strong>${match.homeTeam}</strong> vs <strong>${match.awayTeam}</strong></td>
-                <td><span class="odds">${match.odds1}</span></td>
-                <td><span class="odds">${match.oddsX}</span></td>
-                <td><span class="odds">${match.odds2}</span></td>
                 <td><strong>${match.prediction}</strong></td>
                 <td><span class="badge ${badgeClass}">${match.confidence}</span></td>
                 <td>
