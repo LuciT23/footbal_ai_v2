@@ -209,7 +209,10 @@ def get_rapidapi_matches():
     romania_tz = timezone(timedelta(hours=3))
     now = datetime.now(romania_tz)
     today_str = now.strftime("%Y-%m-%d")
-    url = "https://livescore6.p.rapidapi.com/matches/v2/list-by-date"
+
+    print(f"-->[Verificare] Se solicita meciurile pentru data de AZI: {today_api_str}")
+    
+    url = "https://livescore6.p.rapidapi.com/matches/v2/list-by-date"  
 
     headers = {
         "x-rapidapi-key": RAPIDAPI_KEY,
@@ -220,6 +223,8 @@ def get_rapidapi_matches():
         "date": today_str,
         "timezone": "+03:00"
     }
+
+    response = requests.get(url, headers=headers, params=quertstring)
 
     print(f"--> Apelăm API pentru data: {today_str}...")
     parsed_matches = []
