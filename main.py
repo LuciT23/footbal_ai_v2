@@ -73,26 +73,27 @@ def load_league_confidence_thresholds():
 # ==============================================================================
 def calculate_ai_prediction(p_15, p_25, p_gg, p_ht, p_st): 
     """
-    Motor de decizie bazat exclusiv pe indicatori statistici
-    (fără dependență de cote).
+    Motor de decizie bazat pe indici statistici de goluri și dominanță
     """
-    # 1. Pronosticuri pe Goluri / Ambele Marchează
-    if p_25 >= 70.0 and p_gg >= 60.0:
+    # 1. Piețe pe Goluri (prioritate)
+    if p_25 >= 68.0 and p_gg >= 58.0:
         return "Peste 2.5 Goluri"
-    if p_gg >= 68.0:
+    if p_gg >= 64.0:
         return "GG (Ambele marchează)"
-    if p_15 >= 78.0:
+    if p_15 >= 72.0:
         return "Peste 1.5 Goluri"
 
-    # 2. Pronosticuri pe Rezultat Final / Pauză (bazat pe dominantă statistică)
-    if p_ht >= 75.0 and p_st >= 65.0:
-        return "1 (Dominare Gazde)"
-    elif p_ht <= 40.0 and p_st <= 45.0:
-        return "2 (Dominare Oaspeți)"
-    elif p_ht >= 60.0:
+    # 2. Piețe pe Rezultat / Șansă Dublă în funcție de dominanță (Pauză/Final)
+    if p_ht >= 72.0:
+        return "1 (Gazde dominantă)"
+    elif p_ht <= 45.0 and p_st <= 50.0:
+        return "2 (Oaspeți dominantă)"
+    elif p_ht >= 58.0:
         return "1X"
+    elif p_st >= 60.0:
+        return "X2"
     
-    return "X2"
+    return "Peste 0.5 Goluri HT"
 
 # ==============================================================================
 # 3. SALVARE AUTOMATĂ MECIURI (SUPRASCRIERE PENTRU ZIUA CURENTĂ)
