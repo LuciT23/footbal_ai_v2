@@ -21,33 +21,20 @@ RAPIDAPI_KEY = "2ac6bb003amshea4487405e15e1fp18b95ejsn700b80898b4a"
 
 # ==============================================================================
 # LISTA DE LIGI PERMISE (WHITELIST)
-# Filtru pentru eliminarea ligilor inferioare / neimportante
 # ==============================================================================
 ALLOWED_LEAGUES = [
-    # Top Campionate & Ligi Europene
     "premier league", "la liga", "serie a", "bundesliga", "ligue 1",
     "championship", "2. bundesliga", "serie b", "segunda division",
     "eredivisie", "liga portugal", "pro league", "super lig", "premiership",
-    "Superliga",
-   
-    # România
-    "liga 1", "superliga", "liga i",
-   
-    # Cupe Europene & Internaționale
+    "superliga", "liga 1", "liga i",
     "champions league", "europa league", "conference league", "nations league",
-   
-    # America de Sud & Altele populare
     "brasileiro", "serie a brazil", "copa libertadores", "copa sudamericana", "mls"
 ]
 
 # ==============================================================================
-# 1. FUNCTIA DE MEMORIE & ÎNVĂȚARE (CITIRE DIN ISTORIC_INVATARE.CSV)
+# 1. FUNCTIA DE MEMORIE & ÎNVĂȚARE
 # ==============================================================================
 def load_league_confidence_thresholds():
-    """
-    Citește istoric_invatare.csv și calculează procentul de câștig per ligă.
-    Dacă o ligă are rată de succes > 70%, ajustăm pragul pentru 'Confidence Mare'.
-    """
     file_path = "istoric_invatare.csv"
     if not os.path.exists(file_path):
         return {}
@@ -60,13 +47,13 @@ def load_league_confidence_thresholds():
             for row in reader:
                 liga = row.get("liga", "").strip()
                 status = row.get("status", "").strip()
-               
+                
                 if not liga:
                     continue
-               
+                
                 if liga not in stats_per_league:
                     stats_per_league[liga] = {"total": 0, "wins": 0}
-               
+                
                 stats_per_league[liga]["total"] += 1
                 if status == "WIN":
                     stats_per_league[liga]["wins"] += 1
@@ -82,96 +69,64 @@ def load_league_confidence_thresholds():
         return {}
 
 # ==============================================================================
-# 2. MOTORUL DE DECIZIE AI (CALCUL PRONOSTIC BAZAT PE STATISTICI)
+# 2. MOTORUL DE DECIZIE AI
 # ==============================================================================
-def calculate_ai_prediction(p_15, p_25, p_gg, p_ht, o1, o2):
+def calculate_ai_prediction(p_15, p_25, p_gg, p_ht, p_st): 
     """
-    Stabilește cel mai bun pronostic analizând probabilitățile statistice,
-    nu doar cotele 1X2.
+    Motor de decizie bazat exclusiv pe indicatori statistici
+    (fără dependență de cote).
     """
-    float_o1 = float(o1)
-    float_o2 = float(o2)
-
-    # 1. Meci clar de goluri multe
-    if p_25 >= 72.0 and p_gg >= 60.0:
-        return "Peste 2.5"
-   
-    # 2. Ambele echipe marchează
+    # 1. Pronosticuri pe Goluri / Ambele Marchează
+    if p_25 >= 70.0 and p_gg >= 60.0:
+        return "Peste 2.5 Goluri"
     if p_gg >= 68.0:
-        return "GG"
+        return "GG (Ambele marchează)"
+    if p_15 >= 78.0:
+        return "Peste 1.5 Goluri"
 
-    # 3. Favorită clară acasă
-    if float_o1 <= 1.65 or (p_ht >= 80.0 and float_o1 < 2.10):
-        return "1"
-
-    # 4. Favorită clară în deplasare
-    if float_o2 <= 1.65:
-        return "2"
-
-    # 5. Meci moderat de goluri (Cel mai sigur din punct de vedere statistic)
-    if p_15 >= 75.0:
-        return "Peste 1.5"
-
-    # 6. Default: Șansă dublă acoperită
-    return "1X" if float_o1 <= float_o2 else "X2"
+    # 2. Pronosticuri pe Rezultat Final / Pauză (bazat pe dominantă statistică)
+    if p_ht >= 75.0 and p_st >= 65.0:
+        return "1 (Dominare Gazde)"
+    elif p_ht <= 40.0 and p_st <= 45.0:
+        return "2 (Dominare Oaspeți)"
+    elif p_ht >= 60.0:
+        return "1X"
+    
+    return "X2"
 
 # ==============================================================================
-# 3. SALVARE AUTOMATĂ MECIURI ÎN MECIURI_AZI.CSV
+# 3. SALVARE AUTOMATĂ MECIURI (SUPRASCRIERE PENTRU ZIUA CURENTĂ)
 # ==============================================================================
 def save_matches_to_csv(matches):
-    """
-    Salvează meciurile filtrate de azi în meciuri_azi.csv pentru verificarea ulterioară.
-    """
     file_path = "meciuri_azi.csv"
-    file_exists = os.path.exists(file_path)
-
-    existing_keys = set()
-    if file_exists:
-        try:
-            with open(file_path, mode="r", encoding="utf-8") as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    key = f"{row.get('data')}_{row.get('liga')}_{row.get('echipa_gazda')}_{row.get('echipa_oaspete')}"
-                    existing_keys.add(key)
-        except Exception as e:
-            print(f"--> Eroare la citirea meciuri_azi.csv: {e}")
-
-    today_str = datetime.now().strftime("%Y-%m-%d")
+    today_str = datetime.now().strftime("%Y%m%d")
 
     try:
-        with open(file_path, mode="a", newline="", encoding="utf-8") as f:
+        with open(file_path, mode="w", newline="", encoding="utf-8") as f:
             fieldnames = ["data", "liga", "echipa_gazda", "echipa_oaspete", "pronostic", "cota", "status"]
             writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
 
-            if not file_exists:
-                writer.writeheader()
-
-            added_count = 0
             for m in matches:
-                key = f"{today_str}_{m['league']}_{m['homeTeam']}_{m['awayTeam']}"
-                if key not in existing_keys:
-                    pred = m['prediction']
-                    if pred == "1":
-                        cota = m['odds1']
-                    elif pred == "2":
-                        cota = m['odds2']
-                    else:
-                        cota = m['oddsX']
+                pred = m['prediction']
+                if pred == "1":
+                    cota = m['odds1']
+                elif pred == "2":
+                    cota = m['odds2']
+                else:
+                    cota = m['oddsX']
 
-                    writer.writerow({
-                        "data": today_str,
-                        "liga": m['league'],
-                        "echipa_gazda": m['homeTeam'],
-                        "echipa_oaspete": m['awayTeam'],
-                        "pronostic": pred,
-                        "cota": cota,
-                        "status": "PENDING"
-                    })
-                    existing_keys.add(key)
-                    added_count += 1
+                writer.writerow({
+                    "data": today_str,
+                    "liga": m['league'],
+                    "echipa_gazda": m['homeTeam'],
+                    "echipa_oaspete": m['awayTeam'],
+                    "pronostic": pred,
+                    "cota": cota,
+                    "status": "PENDING"
+                })
 
-            if added_count > 0:
-                print(f"--> [AUTO-SAVE] S-au salvat {added_count} meciuri noi în 'meciuri_azi.csv'.")
+        print(f"--> [AUTO-SAVE] S-au salvat {len(matches)} meciuri noi în '{file_path}'.")
     except Exception as e:
         print(f"--> Eroare la salvarea în meciuri_azi.csv: {e}")
 
@@ -192,133 +147,127 @@ def read_css():
 @app.get("/app.js")
 def read_js():
     return FileResponse("app.js")
-    
-@app.get("manifest.json")
+
+@app.get("/manifest.json")
 def read_manifest():
     return FileResponse("manifest.json")
-    
+
 # ==============================================================================
-# ENDPOINT: LISTA MECIURI (ADAPTAT PENTRU LIVESCORE API)
+# ENDPOINT: LISTA MECIURI (FLASHSCORE / LIVESCORE HYBRID PARSER)
 # ==============================================================================
-@app.get("/api/matches")
+@app.get("/api/matches") 
 def get_rapidapi_matches():
     global cached_matches, last_fetch_time
-   
+
     league_accuracy = load_league_confidence_thresholds()
 
     romania_tz = timezone(timedelta(hours=3))
     now = datetime.now(romania_tz)
-    today_str = now.strftime("%Y-%m-%d")
+    today_api_str = now.strftime("%Y-%m-%d")
 
-    print(f"-->[Verificare] Se solicita meciurile pentru data de AZI: {today_api_str}")
-    
-    url = "https://livescore6.p.rapidapi.com/matches/v2/list-by-date"  
+    url = "https://flashscore4.p.rapidapi.com/api/flashscore/v2/matches/list-by-date"
+
+    querystring = {
+        "sport_id": "1",
+        "date": today_api_str,
+        "timezone": "Europe/Bucharest"
+    }
 
     headers = {
         "x-rapidapi-key": RAPIDAPI_KEY,
-        "x-rapidapi-host": "livescore6.p.rapidapi.com"
+        "x-rapidapi-host": "flashscore4.p.rapidapi.com",
+        "Content-Type": "application/json"
     }
 
-    querystring = {
-        "date": today_str,
-        "timezone": "+03:00"
-    }
-
-    response = requests.get(url, headers=headers, params=quertstring)
-
-    print(f"--> Apelăm API pentru data: {today_str}...")
+    print(f"--> Apelăm API pentru data: {today_api_str}...")
     parsed_matches = []
 
     try:
         response = requests.get(url, headers=headers, params=querystring)
         print(f"--> Status Code API: {response.status_code}")
-     
+
         if response.status_code == 200:
             data = response.json()
-            stages = data.get("Stages", [])
-            
             raw_matches_count = 0
 
-            # 1. Trecem prin fiecare Ligă/Competiție (Stage)
-            for stage in stages:
-                league_name = stage.get("Cnm") or stage.get("Snm") or "Fotbal Generat"
-                events = stage.get("Events", [])
+            # data este o listă de turnee
+            tournaments = data if isinstance(data, list) else data.get("DATA", data.get("Stages", []))
 
-                # 2. Trecem prin fiecare Meci (Event) din ligă
-                for item in events:
+            for stage in tournaments:
+                if not isinstance(stage, dict):
+                    continue
+
+                league_name = stage.get("name") or stage.get("NAME") or stage.get("Cnm") or "Fotbal Generat"
+                
+                # Meciurile sunt în lista 'matches'
+                matches_list = stage.get("matches", [])
+
+                for item in matches_list:
+                    if not isinstance(item, dict):
+                        continue
+
                     raw_matches_count += 1
-                    
-                    # FILTRARE WHITELIST (LIGI PERMISE) - opțional
-                    # league_lower = str(league_name).lower()
-                    # if not any(allowed in league_lower for allowed in ALLOWED_LEAGUES):
-                    # continue
 
-                    # Extragere Echipe din T1 (Gazde) și T2 (Oaspeți)
-                    t1_list = item.get("T1", [])
-                    t2_list = item.get("T2", [])
+                    # Extragere nume echipe din dicționarele 'home_team' și 'away_team'
+                    home_obj = item.get("home_team", {})
+                    away_obj = item.get("away_team", {})
 
-                    home_team = t1_list[0].get("Nm", "Gazde") if isinstance(t1_list, list) and len(t1_list) > 0 else "Gazde"
-                    away_team = t2_list[0].get("Nm", "Oaspeți") if isinstance(t2_list, list) and len(t2_list) > 0 else "Oaspeți"
+                    home_str = home_obj.get("name") if isinstance(home_obj, dict) else str(home_obj)
+                    away_str = away_obj.get("name") if isinstance(away_obj, dict) else str(away_obj)
 
-                    home_str = str(home_team)
-                    away_str = str(away_team)
+                    if not home_str or not away_str:
+                        home_str = "Gazde"
+                        away_str = "Oaspeți"
 
-                    # Excludem meciurile de tineret sau rezervă
+                    # Filtru tineret / rezerve
                     if any(p in home_str.lower() or p in away_str.lower() for p in [" ii", " 2", " b ", " u21", " u19"]):
                         continue
 
-                    # Extragere oră meci (Esd contine timestamp de tip 20260804190000)
-                    esd = str(item.get("Esd", ""))
-                    if len(esd) >= 12:
-                        match_time = f"{esd[8:10]}:{esd[10:12]}"
+                    # Extragere Oră din timestamp
+                    timestamp = item.get("timestamp")
+                    if timestamp:
+                        match_dt = datetime.fromtimestamp(timestamp, tz=romania_tz)
+                        match_time = match_dt.strftime("%H:%M")
                     else:
                         match_time = "19:00"
 
-                    # Extragere / Generare Cote
-                    o1 = f"{round(random.uniform(1.40, 3.20), 2):.2f}"
-                    ox = f"{round(random.uniform(3.10, 4.10), 2):.2f}"
-                    o2 = f"{round(random.uniform(1.80, 4.80), 2):.2f}"
-
-                    # Generare Statistici Deterministice (Seed per meci)
+                     # Indici Statistici Deterministici (simulați pe baza numelor echipelor) 
                     seed_val = sum(ord(c) for c in (home_str + away_str))
                     rng = random.Random(seed_val)
+                    
                     p_15 = round(rng.uniform(62.0, 91.0), 2)
                     p_25 = round(rng.uniform(42.0, 78.0), 2)
-                    p_ht = round(rng.uniform(55.0, 88.0), 2)
+                    p_ht = round(rng.uniform(55.0, 88.0), 2) # Forma / Dominanță Pauză
+                    p_st = round(rng.uniform(48.0, 82.0), 2) # Forma / Dominanță Repriza 2
                     p_gg = round(rng.uniform(38.0, 72.0), 2)
 
-                    # Calcul Pronostic Inteligent
-                    pred = calculate_ai_prediction(p_15, p_25, p_gg, p_ht, o1, o2)
+                    # Calcul Pronostic FĂRĂ COTE
+                    pred = calculate_ai_prediction(p_15, p_25, p_gg, p_ht, p_st)
 
-                    # Calcul Încredere
                     acc = league_accuracy.get(str(league_name), 50.0)
-                    if acc >= 70.0 or p_15 >= 80.0 or float(o1) <= 1.65:
-                        conf = "Mare"
-                    else:
-                        conf = "Mediu"
+                    conf = "Ridicată" if (acc >= 65.0 or p_15 >= 80.0 or p_25 >= 72.0) else "Medie"
 
-                    match_data = {
+                    parsed_matches.append({
                         "datetime": f"Azi, {match_time}",
                         "league": str(league_name),
                         "homeTeam": home_str,
                         "awayTeam": away_str,
-                        "odds1": str(o1),
-                        "oddsX": str(ox),
-                        "odds2": str(o2),
                         "prediction": pred,
-                        "confidence": conf
-                    }
+                        "confidence": conf,
+                        "stats": {
+                            "p_15": p_15,
+                            "p_25": p_25,
+                            "p_gg": p_gg
+                        }
+                    })
 
-                    parsed_matches.append(match_data)
 
             print(f"--> S-au identificat {raw_matches_count} meciuri brute în JSON-ul API-ului.")
             cached_matches = parsed_matches
             last_fetch_time = now
             print(f"--> Total meciuri relevante procesate și afișate: {len(parsed_matches)}")
 
-            # SALVARE AUTOMATĂ
             save_matches_to_csv(parsed_matches)
-
         else:
             print(f"--> Eroare API {response.status_code}: {response.text}")
 
@@ -350,7 +299,7 @@ def get_match_analytics(home: str, away: str):
             return "orange"
         return "red"
 
-    analytics = {
+    return {
         "teams": {"home": home, "away": away},
         "overall_probabilities": [
             {"label": "Peste 1.5 Goluri", "val": p_15, "color": get_color(p_15)},
@@ -362,8 +311,6 @@ def get_match_analytics(home: str, away: str):
             {"label": "Peste 9.5 Cornere", "val": p_corners, "color": get_color(p_corners)}
         ]
     }
-
-    return analytics
 
 # ==============================================================================
 # PORNIRE SERVER
